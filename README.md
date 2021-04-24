@@ -1,1 +1,1 @@
-unibg Ing. Informatica
+Unibg
