@@ -1,6 +1,6 @@
 const connect_to_db = require('./db');
 
-// GET BY TALK HANDLER
+// GET BY WATCH NEXT HANDLER
 
 const watch = require('./Watch');
 
@@ -11,7 +11,7 @@ module.exports.get_by_tag = (event, context, callback) => {
     if (event.body) {
         body = JSON.parse(event.body)
     }
-    // set default
+
     if(!body.id) {
         callback(null, {
                     statusCode: 500,
