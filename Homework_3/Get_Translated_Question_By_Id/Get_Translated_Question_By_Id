@@ -1,0 +1,180 @@
+var AWS = require('aws-sdk')
+AWS.config.update({region: 'us-east-1'})
+var translate = new AWS.Translate();
+
+const connect_to_db = require('./db');
+
+// GET BY QUESTION HANDLER
+
+const questions = require('./Question');
+
+module.exports.get_question_id = (event, context, callback) => {
+    context.callbackWaitsForEmptyEventLoop = false;
+    console.log('Received event:', JSON.stringify(event, null, 2));
+    let body = {}
+    if (event.body) {
+        body = JSON.parse(event.body)
+    }
+    // set default
+    if(!body.id) {
+        callback(null, {
+                    statusCode: 500,
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: 'Could not fetch the watch next. Id is null.'
+        })
+    }
+    
+    connect_to_db().then(() => {
+        console.log('=> get questions');
+        questions.find({_id: body.id}, {_id: 1, questions_obj: 1})
+            .then(quest => {
+                    console.log("We found this questions:" + quest)
+                    console.log("Typeof:" + typeof(quest))
+                    for (var key in quest) {
+                        console.log("Object extracted" + JSON.stringify(quest[key].questions_obj))
+                        for (var it in quest[key].questions_obj) {
+                            console.log("What the fuck is this "+ it + " " + quest[key].questions_obj[it] + JSON.stringify(quest[key].questions_obj[it]))
+                            var question_obj = quest[key].questions_obj[it]
+                            // translate_question_object(question_obj, 'it')
+                            for (var it in question_obj) {
+                                var translateParams = {
+                                    SourceLanguageCode: 'en',
+                                    TargetLanguageCode: 'it',
+                                    Text: question_obj[it]
+                                };
+                                console.log("inside we have " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
+                                translate.translateText(translateParams, function (err, data) {
+                                    if (err) 
+                                        console.log("We receviced an error" + err)
+                                    question_obj[it] = data.TranslatedText
+                                    console.log("The message translated is:" + data.TranslatedText)
+                                });
+                                setTimeout(function(){ }, 1000); 
+                                console.log("iTranslated: " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
+                            }
+                        }
+                    }
+                    console.log("We found this questions:" + quest)
+                    
+                    let message = ''
+                    var translateParams = {
+                        SourceLanguageCode: 'en',
+                        TargetLanguageCode: 'it',
+                        Text: "Hello World!" //event.sentence
+                    };
+                    
+                    var result = translate.translateText(translateParams);
+                    console.log("The response is:" + result.response.data)
+                    for (var key in result) {
+                        console.log("Iterating "+ key + "Object")
+                        console.log("Object extracted" + result[key])
+                        for (var key_2 in result[key]) {
+                            console.log("Iterating inside "+ key_2 + "Object")
+                            console.log("Object inside" + result[key][key_2])
+                        }
+                    }
+                    callback(null, {
+                        statusCode: 200,
+                        body: JSON.stringify(quest)
+                    })
+                }
+            ).catch(err =>
+                callback(null, {
+                    statusCode: err.statusCode || 500,
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: 'Could not fetch the questions'
+                })
+            );
+        // questions.find({_id: body.id}, {_id: 1, questions_obj: 1}, function (err, quest) 
+        // {
+        //     if (err) {
+        //         callback(null,{
+        //             statusCode: 500,
+        //             headers:{'Content-Type':'text/plain'},
+        //             body: 'Error while checking if already reviewed the talk'+err
+        //         })
+        //     } else if (quest) {
+        //         if (isEmptyObject(quest)) {
+        //             callback(null, {        
+        //                 statusCode: 500,
+        //                 headers: { 'Content-Type': 'text/plain' },
+        //                 body: 'No questions available for this id.'
+        //             })
+        //         }
+                
+        //         for (var key of Object.keys(quest)) {
+        //             console.log(key + " -> " + quest[key])
+        //             var mybejson = JSON.stringify(quest[key])
+        //             console.log("Length" + mybejson.length)
+        //             console.log("This is the type:" + typeof(quest[key]))
+        //              for (var key_2 of Object.keys(quest[key])) {
+        //                 console.log(key_2 + " -> " + quest[key][key_2])
+        //              }
+        //         }
+                
+        //         console.log("=> we found some question for this id")
+        //         let message = ''
+        //         var translateParams = {
+        //             SourceLanguageCode: 'en',
+        //             TargetLanguageCode: 'it',
+        //             Text: "Hello World!" //event.sentence
+        //         };
+                
+        //         // translate.translateText(translateParams, function (err, data) {
+        //         //     if (err) 
+        //         //         console.log(err)
+        //         //     message = data.TranslatedText
+        //         //     console.log("The message translated is:" + message)
+        //         // });
+        //         callback(null, {
+        //             statusCode: 200,
+        //             body: JSON.stringify(quest)
+        //         })
+        //     } else {
+        //         callback(null, {        
+        //              statusCode: err.statusCode || 500,
+        //              headers: { 'Content-Type': 'text/plain' },
+        //              body: 'No questions available for this id.'
+        //         })
+        //     }
+        // });
+        // questions.find({_id: body.id},{_id: 1, watch_next_obj: 1})
+        //     .then(talks => {
+        //             callback(null, {
+        //                 statusCode: 200,
+        //                 body: JSON.stringify(talks)
+        //             })
+        //         }
+        //     )
+        //     .catch(err =>
+        //         callback(null, {
+        //             statusCode: err.statusCode || 500,
+        //             headers: { 'Content-Type': 'text/plain' },
+        //             body: 'Could not fetch the id.'
+        //         })
+        //     );
+    });
+};
+
+function isEmptyObject(obj) {
+  return !Object.keys(obj).length;
+}
+
+function translate_question_object(obj, language) {
+    for (var it in obj) {
+        var translateParams = {
+            SourceLanguageCode: 'en',
+            TargetLanguageCode: language,
+            Text: obj[it]
+        };
+        console.log("inside we have " + it + " "+ obj[it] + " " + JSON.stringify(obj[it]))
+        translate.translateText(translateParams, function (err, data) {
+            if (err) 
+                console.log("We receviced an error" + err)
+            obj[it] = data.TranslatedText
+            console.log("The message translated is:" + data.TranslatedText)
+        });
+        console.log("iTranslated: " + it + " "+ obj[it] + " " + JSON.stringify(obj[it]))
+    }
+    
+}
