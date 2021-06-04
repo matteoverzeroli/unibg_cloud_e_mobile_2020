@@ -28,55 +28,73 @@ module.exports.get_question_id = (event, context, callback) => {
                     body: 'Could not fetch the watch next. Id is null.'
         })
     }
+    
+    if (!body.language) {
+        body.language = 'en';
+    }
+    
+    if (!body.level) {
+        //implement
+    }
+    
+    if (!body.doc_per_page) {
+        //implement
+    }
+    
+    if (!body.page_num) {
+        //implement
+    }
+    
     console.log("Connect to db...")
     connect_to_db().then(() => {
-
         console.log('=> get questions');
         questions.find({_id: body.id}, {_id: 1, questions_obj: 1})
-            .then(async (quest) =>{
-                    console.log("We found this questions:" + quest)
-                    console.log("Typeof:" + typeof(quest))
-                    for (var key in quest) {
-                        console.log("Object extracted" + JSON.stringify(quest[key].questions_obj))
-                        for (var it in quest[key].questions_obj) {
-                            console.log("What the fuck is this "+ it + " " + quest[key].questions_obj[it] + JSON.stringify(quest[key].questions_obj[it]))
-                            var question_obj = quest[key].questions_obj[it]
-                            for (var it in question_obj) {
-                               await traduci(question_obj,it);
-                            }
+        .then(async (quest) =>{
+                console.log("We found this questions:" + quest)
+                console.log("Typeof:" + typeof(quest))
+                for (var key in quest) {
+                    console.log("Object extracted" + JSON.stringify(quest[key].questions_obj))
+                    for (var it in quest[key].questions_obj) {
+                        console.log("What the fuck is this "+ it + " " + quest[key].questions_obj[it] + JSON.stringify(quest[key].questions_obj[it]))
+                        var question_obj = quest[key].questions_obj[it]
+                        for (var it in question_obj) {
+                            if (it != "level")
+                                await traduci(question_obj,it, body.language);
                         }
                     }
                 }
-            ).then(() => {
-                console.log(("At the end"));
-                    callback(null, {
-                        statusCode: 200,
-                        body: "ok"
-                    })})
-            .catch(err =>
                 callback(null, {
-                    statusCode: err.statusCode || 500,
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: 'Could not fetch the questions'
+                    statusCode: 200,
+                    body: JSON.stringify(quest)
                 })
-            );
+            }
+        )
+        .catch(err =>
+            callback(null, {
+                statusCode: err.statusCode || 500,
+                headers: { 'Content-Type': 'text/plain' },
+                body: 'Could not fetch the questions'
+            })
+        );
     });
 };
 
 
-const traduci = async (question_obj,it) => {
-     return new Promise((resolve, reject) => {
+const traduci = async (question_obj,it,language) => {
+    return new Promise((resolve, reject) => {
         var translateParams = {
-        SourceLanguageCode: 'en',
-        TargetLanguageCode: 'it',
-        Text: JSON.stringify(question_obj[it])
-    };
-    console.log("inside we have " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
-    translate.translateText(translateParams, (err, data) => {
-    if (err) console.log("Erros String: " + err)
-    console.log("Latest Translation: " + data.TranslatedText)
-    
-    resolve();
-    
-    })});
+            SourceLanguageCode: 'en',
+            TargetLanguageCode: language,
+            Text: JSON.stringify(question_obj[it])
+        };
+        console.log("inside we have " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
+        translate.translateText(translateParams, (err, data) => {
+            if (err) console.log("Erros String: " + err)
+            console.log("Latest Translation: " + data.TranslatedText)
+            question_obj[it] = data.TranslatedText
+            //to do bisogna lavorare sul dato, in ogni lingua ci sono delle virgolette diverse che vengono aggiunte.
+            // probabilmente basta eliminare sempre il primo e l'ultimo carattere
+            resolve();
+        })
+    });
 }
