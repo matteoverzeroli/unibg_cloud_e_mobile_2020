@@ -1,6 +1,11 @@
+/**
+ * TO BE REVIEWED
+ * 
+ */
 var AWS = require('aws-sdk')
 AWS.config.update({region: 'us-east-1'})
 var translate = new AWS.Translate();
+
 
 const connect_to_db = require('./db');
 
@@ -25,9 +30,10 @@ module.exports.get_question_id = (event, context, callback) => {
     }
     console.log("Connect to db...")
     connect_to_db().then(() => {
+
         console.log('=> get questions');
         questions.find({_id: body.id}, {_id: 1, questions_obj: 1})
-            .then(quest => {
+            .then(async (quest) =>{
                     console.log("We found this questions:" + quest)
                     console.log("Typeof:" + typeof(quest))
                     for (var key in quest) {
@@ -35,63 +41,19 @@ module.exports.get_question_id = (event, context, callback) => {
                         for (var it in quest[key].questions_obj) {
                             console.log("What the fuck is this "+ it + " " + quest[key].questions_obj[it] + JSON.stringify(quest[key].questions_obj[it]))
                             var question_obj = quest[key].questions_obj[it]
-                            // translate_question_object(question_obj, 'it')
                             for (var it in question_obj) {
-                                var translateParams = {
-                                    SourceLanguageCode: 'en',
-                                    TargetLanguageCode: 'it',
-                                    Text: JSON.stringify(question_obj[it])
-                                };
-                                console.log("inside we have " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
-                                translate.translateText(translateParams, (err, data) => {
-                                    if (err) console.log("Erros String: " + err)
-                                    console.log("Latest Translation: " + data.TranslatedText)
-                                });
-                                
-                                // for (var key in data) {
-                                //     console.log("--> " + key + " " + data[key])
-                                //     for (var key_2 in data[key]) {
-                                //         console.log("|------- " + key_2 + " " + data[key][key_2]) 
-                                //         for (var key_3 in data[key][key_2]) {
-                                //             console.log("|--------------- " + key_3 + " " + data[key][key_2][key_3]) 
-                                //         }
-                                //     }
-                                // }
-                                //const data = await translateText(JSON.stringify(question_obj[it]), 'it')
-                                //console.log("Data Translated:" + data.TranslatedText)
-                                // translate.translateText(translateParams)
-                                // .then((data) => {
-                                //     console.log("Before setting the translations")
-                                //     question_obj[it] = JSON.parse(data.TranslatedText)
-                                //     console.log("The message translated is:" + data.TranslatedText)
-                                // })
-                                // .catch((error) => {
-                                //     console.log("We receviced an error" + error)
-                                // });
-                                // console.log("iTranslated: " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
+                               await traduci(question_obj,it);
                             }
                         }
                     }
-                    var translateParams = {
-                        SourceLanguageCode: 'en',
-                        TargetLanguageCode: 'it',
-                        Text: 'Hi how are you?'
-                    };
-                    
-                    console.log("starting to translate")
-                    translate.translateText(translateParams, (err, data) => {
-                        if (err) console.log("Erros String: " + err)
-                        console.log("Latest Translation: " + data.TranslatedText)
-                    });
-                    
-                    console.log("But we need to go on")
-                    console.log("We found this questions:" + quest)
-                    // callback(null, {
-                    //     statusCode: 200,
-                    //     body: JSON.stringify(quest)
-                    // })
                 }
-            ).catch(err =>
+            ).then(() => {
+                console.log(("At the end"));
+                    callback(null, {
+                        statusCode: 200,
+                        body: "ok"
+                    })})
+            .catch(err =>
                 callback(null, {
                     statusCode: err.statusCode || 500,
                     headers: { 'Content-Type': 'text/plain' },
@@ -101,51 +63,20 @@ module.exports.get_question_id = (event, context, callback) => {
     });
 };
 
-function isEmptyObject(obj) {
-  return !Object.keys(obj).length;
-}
 
-function translate_question_object(obj, language) {
-    for (var it in obj) {
+const traduci = async (question_obj,it) => {
+     return new Promise((resolve, reject) => {
         var translateParams = {
-            SourceLanguageCode: 'en',
-            TargetLanguageCode: language,
-            Text: obj[it]
-        };
-        console.log("inside we have " + it + " "+ obj[it] + " " + JSON.stringify(obj[it]))
-        translate.translateText(translateParams, function (err, data) {
-            if (err) 
-                console.log("We receviced an error" + err)
-            obj[it] = data.TranslatedText
-            console.log("The message translated is:" + data.TranslatedText)
-        });
-        console.log("iTranslated: " + it + " "+ obj[it] + " " + JSON.stringify(obj[it]))
-    }
+        SourceLanguageCode: 'en',
+        TargetLanguageCode: 'it',
+        Text: JSON.stringify(question_obj[it])
+    };
+    console.log("inside we have " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
+    translate.translateText(translateParams, (err, data) => {
+    if (err) console.log("Erros String: " + err)
+    console.log("Latest Translation: " + data.TranslatedText)
     
-}
-
-const translateText = async (originalText, targetLanguageCode) => {
-    return new Promise((resolve, reject) => {
-        let params = {
-            Text: originalText,
-            SourceLanguageCode: "auto",
-            TargetLanguageCode: targetLanguageCode
-        }
+    resolve();
     
-        try {
-            translate.translateText(params, (err, data) => {
-                if (err) {
-                    console.log('translateText error: ', err)
-                    reject(err)
-                }
-
-                console.log('translateText data: ', data)
-                if (data) resolve(data)
-            })
-        } catch (err) {
-            console.error(err)
-        }
-    })
+    })});
 }
-
-
