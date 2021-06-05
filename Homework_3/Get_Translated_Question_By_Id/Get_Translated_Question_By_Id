@@ -94,9 +94,8 @@ const traduci = async (question_obj,it,language) => {
         translate.translateText(translateParams, (err, data) => {
             if (err) console.log("Erros String: " + err)
             console.log("Latest Translation: " + data.TranslatedText)
-            question_obj[it] = data.TranslatedText
-            //to do bisogna lavorare sul dato, in ogni lingua ci sono delle virgolette diverse che vengono aggiunte.
-            // probabilmente basta eliminare sempre il primo e l'ultimo carattere
+            let translated = JSON.stringify(data.TranslatedText)
+            question_obj[it] = translated.substring(2, translated.length - 2)
             resolve();
         })
     });
