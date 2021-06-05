@@ -33,24 +33,26 @@ module.exports.get_question_id = (event, context, callback) => {
         body.language = 'en';
     }
     
+    if (!body.level) {
+        body.level = [0,1,2,3,4,5]
+    }
+    
     if (!body.doc_per_page) {
-        //implement
+        body.doc_per_page = 3
     }
     
-    if (!body.page_num) {
-        //implement
+    if (!body.page) {
+        body.page = 1
     }
     
-    console.log("Connect to db...")
+    console.log("Connect to db..." + body.doc_per_page)
     connect_to_db().then(() => {
         console.log('=> get questions');
-        questions.find({_id: body.id}, {_id: 1, questions_obj: 1})
+        questions.find({_id: body.id, questions_obj: { $elemMatch: {level: body.level}}}, 
+                        {_id: 1, "questions_obj.$": 1})
         .then(async (quest) => {
                 console.log("We found this questions:" + quest)
                 console.log("Typeof:" + typeof(quest))
-                
-                if (body.level)
-                    filterQuestionsByLevel(quest, body.level);
                 
                 for (var key in quest) {
                     console.log("Object extracted" + JSON.stringify(quest[key].questions_obj))
@@ -80,39 +82,7 @@ module.exports.get_question_id = (event, context, callback) => {
     });
 };
 
-const filterQuestionsByLevel= async(question, level) => {
-    return new Promise((resolve, reject) => {
-        var deleted;
-        do {
-            deleted = false;
-            for (let key in question) {
-                console.log("Key:" + key)
-                for (let it in question[key].questions_obj) {
-                    console.log("it:" + it)
-                    let question_obj = question[key].questions_obj[it]
-                    for (let it_2 in question_obj) {
-                        console.log("it_2:" + it_2 + " " + question_obj[it_2])
-                        if (it_2 == "level") {
-                            if (question_obj[it_2] != level) {
-                                question[key].questions_obj.splice(it, 1)
-                                console.log("Deleting:" + question_obj[it_2] + " " + question)
-                                deleted = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (deleted)
-                        break;
-                }
-                if (deleted)
-                    break;
-            }
-        } while (deleted);
-        
-        resolve();
-    });
-}
-
+// translating objects using AWS Translate
 const traduci = async (question_obj,it,language) => {
     return new Promise((resolve, reject) => {
         var translateParams = {
