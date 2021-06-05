@@ -1,22 +1,25 @@
+// GET BY QUESTION HANDLER
+
+//initialize Amazon Translate
 var AWS = require('aws-sdk')
 AWS.config.update({region: 'us-east-1'})
 var translate = new AWS.Translate();
 
-
 const connect_to_db = require('./db');
-
-// GET BY QUESTION HANDLER
 
 const questions = require('./Question');
 
 module.exports.get_question_id = (event, context, callback) => {
     context.callbackWaitsForEmptyEventLoop = false;
+    
     console.log('Received event:', JSON.stringify(event, null, 2));
+    
     let body = {}
+    // parse body content
     if (event.body) {
         body = JSON.parse(event.body)
     }
-    // set default
+    // control id
     if(!body.id) {
         callback(null, {
                     statusCode: 500,
@@ -24,15 +27,15 @@ module.exports.get_question_id = (event, context, callback) => {
                     body: 'Could not fetch the watch next. Id is null.'
         })
     }
-    
+    // set english as default target language if not specified
     if (!body.language) {
         body.language = 'en';
     }
     
     if (!body.level) {
-        body.level = "1";
+        body.level = "1"; //set default requested level to 1 if not specified
     } else {
-        if (body.level > 5) {
+        if (body.level > 5 || body.level < 1) { //control level filed
             callback(null, {
                 statusCode: 500,
                 body: 'The level must be an integer between 1-5'
@@ -41,8 +44,10 @@ module.exports.get_question_id = (event, context, callback) => {
     }
 
     console.log("Connect to db...")
+    
     connect_to_db().then(() => {
         console.log('=> get questions');
+        //get question from MongoDB with the specified id and level
         questions.aggregate([
             { "$match" : {"_id" : body.id } },
             { "$project" : {_id: 1, questions_obj: {
@@ -56,23 +61,27 @@ module.exports.get_question_id = (event, context, callback) => {
         }
         ])
         .then(async (quest) => {
-                console.log("We found this questions:" + quest)
-                console.log("Typeof:" + typeof(quest))
+                console.log("We found this questions:" + quest);
+                console.log("Typeof:" + typeof(quest));
                 
                 if (body.language != 'en') {
                     for (var key in quest) {
-                        console.log("Object extracted" + JSON.stringify(quest[key].questions_obj))
-                        for (var it in quest[key].questions_obj) {
-                            console.log("What the fuck is this "+ it + " " + quest[key].questions_obj[it] + JSON.stringify(quest[key].questions_obj[it]))
-                            var question_obj = quest[key].questions_obj[it]
-                            for (var it in question_obj) {
-                                console.log("Livello:" + question_obj[it])
-                                if (it != "level")
-                                    await traduci(question_obj,it, body.language);
+                        console.log("Object extracted" + JSON.stringify(quest[key].questions_obj));
+                        
+                        for (var element in quest[key].questions_obj) {
+                            console.log("Questions extracted "+ element + " " + quest[key].questions_obj[element] + JSON.stringify(quest[key].questions_obj[element]));
+                            var question_obj = quest[key].questions_obj[element];
+                            
+                            for (var item in question_obj) {
+                                console.log("Item:" + question_obj[item]);
+                                
+                                if (item != "level") //do not translate level field
+                                    await translate_item(question_obj,item, body.language);
                             }
                         }
                     }
                 }
+                // send response
                 callback(null, {
                     statusCode: 200,
                     body: JSON.stringify(quest)
@@ -89,21 +98,26 @@ module.exports.get_question_id = (event, context, callback) => {
     });
 };
 
-// translating objects using AWS Translate
-const traduci = async (question_obj,it,language) => {
+// translating items using AWS Translate
+const translate_item = async (question_obj,item,language) => {
     return new Promise((resolve, reject) => {
         var translateParams = {
             SourceLanguageCode: 'en',
             TargetLanguageCode: language,
-            Text: JSON.stringify(question_obj[it])
+            Text: JSON.stringify(question_obj[item])
         };
-        console.log("inside we have " + it + " "+ question_obj[it] + " " + JSON.stringify(question_obj[it]))
+        console.log("inside we have " + item + " "+ question_obj[item] + " " + JSON.stringify(question_obj[item]))
         translate.translateText(translateParams, (err, data) => {
-            if (err) console.log("Erros String: " + err)
+            
+            if (err){
+                console.log("Erros String: " + err)
+            }
+            
             console.log("Latest Translation: " + data.TranslatedText)
             let translated = JSON.stringify(data.TranslatedText)
-            question_obj[it] = translated.substring(2, translated.length - 2)
-            resolve();
+            question_obj[item] = translated.substring(2, translated.length - 2) //remove quote from the translation
+            
+            resolve();// resolve promise
         })
     });
 }
